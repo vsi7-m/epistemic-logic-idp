@@ -1,0 +1,584 @@
+vocabulary shared{
+	type agent
+    type primitiveProp
+    type group // verzameling van groepen
+    InGroup(agent, group) // geeft aan welke agent in welke groep zit
+}
+
+vocabulary KripkeStructureVoc{
+    extern vocabulary shared
+    type state
+    holds(state,primitiveProp) // is waar asa #2 waar is in state #1.
+    pos(agent,state, state) // is waar asa agent #1 #3 mogelijk acht vanuit #2.
+    
+    // Voeg meer predicaten/functies toe indien nodig
+}
+
+
+// *************** Taak 1 **************************
+theory ValidKripkeStructureTheory:KripkeStructureVoc{
+    // reflexive : elke agent beschouwt de huidige state mogelijk
+    ! a[agent], s[state] : pos(a, s, s).
+    
+    // symmetric : als s2 mogelijk is vanuit s1, dan is s1 ook mogelijk vanuit s2
+    ! a[agent], s1[state], s2[state] : pos(a, s1, s2) => pos(a, s2, s1). 
+    
+    // transitive: als s2 mogelijk is vanuit s1 EN s3 is mogelijk vanuit s2, 
+ 	//dan is s3 ook mogelijk vanuit s1
+    ! a[agent], s1[state], s2[state], s3[state] : (pos(a, s1, s2) & pos(a, s2, s3)) => pos(a, s1, s3).
+}
+
+// *************************************************************
+
+// De volgende structuren geven enkele voorbeelden van correcte en incorrecte Kripke structuren.
+structure ValidKripkeStructureTest1:KripkeStructureVoc{
+   state = {u;s;t}
+   primitiveProp = {p}
+   agent={a1; a2}
+   
+   holds = {u, p; s,p}
+   pos={a1, u, s; a1, s, u; a2, s, t; a2, t,s; a1,u,u; a1,s,s; a1,t,t; a2,u,u; a2,s,s; a2,t,t}
+}
+
+structure InvalidKripkeStructureTest1:KripkeStructureVoc{
+   state = {u;s;t}
+   primitiveProp = {p}
+   agent={a1; a2}
+   
+   holds = {u, p; s,p}
+   pos={a1, u, s; a2, s, t; a2, t,s; a1,u,u; a1,s,s; a1,t,t; a2,u,u; a2,s,s; a2,t,t}
+}
+
+structure InvalidKripkeStructureTest2:KripkeStructureVoc{
+   state = {u;s;t}
+   primitiveProp = {p}
+   agent={a1; a2}
+   
+   holds = {u, p; s,p}
+   pos={a1, u, s; a1, s, u; a2, s, t; a2, t,s; a1,u,u; a1,t,t; a2,u,u; a2,s,s; a2,t,t}
+}
+
+structure InvalidKripkeStructureTest3:KripkeStructureVoc{
+   state = {u;s;t;v}
+   primitiveProp = {p}
+   agent={a1; a2}
+   
+   holds = {u, p; s,p}
+   pos={a1, u, s; a1, s, u; a1,u,v; a1,v,u; a2, s, t; a2, t,s; a1,u,u; a1,s,s; a1,t,t; a2,u,u; a2,s,s; a2,t,t; a1,v,v; a2,v,v; }
+}
+
+// *************** Taak 2 **************************
+structure Task2Structure : KripkeStructureVoc {
+    state = {s1; s2; s3}                // 3 states
+    agent = {a1; a2}                    // 2 agenten
+    primitiveProp = {p1; p2}            // 2 primitive proposities
+    // holds en pos worden leeg gelaten zodat IDP deze zelf kan genereren o.b.v. ValidKripkeStructureTheory
+}
+
+// ***************************************************************
+
+
+// Het vocabularium FormulaVoc beschrijft de ontologie die nodig is om een formule in epistemische logica te modelleren.
+vocabulary FormulaVoc{
+    extern vocabulary shared
+    type formula
+    Prop(primitiveProp,formula) // #2 is de primitieve propositie #1
+    Neg(formula, formula) // #2 is de formule ~#1
+    And(formula, formula, formula) // #3 is de formule #1 & #2
+    Knows(agent,formula,formula) // #3 is de formule K_#1 #2
+    
+    // Voeg meer predicaten/functies toe indien nodig
+    Parent(formula, formula)     // #1 is de parent van #2 (Parent(parent, child))
+    Descendant(formula, formula) // #1 is een descendant van #2
+    Root(formula)             // is waar als de formule de root van de boom is
+    
+    Common(group, formula, formula)     // #3 is de formule C_#1(#2)
+    Distributed(group, formula, formula)  // #3 is de formule D_#1(#2)
+    
+}
+
+// *************** Taak 3 **************************
+theory SyntaxOfModalFormulas:FormulaVoc{
+    // Elke formule is exact éénmaal gedefinieerd
+    // De som van het aantal keren dat een formule f als resultaat wordt opgebouwd is 1
+    ! f[formula] : #{p[primitiveProp] : Prop(p, f)} + 
+                  #{f1[formula] : Neg(f1, f)} + 
+                  #{f1[formula], f2[formula] : And(f1, f2, f)} + 
+                  #{a[agent], f1[formula] : Knows(a, f1, f)}  +
+    			  #{g[group], f1[formula] : Common(g, f1, f)} + 
+    			  #{g[group], f1[formula] : Distributed(g, f1, f)} = 1.
+    
+    // Definitie parent-child relatie: samengestelde formule is de ouder van zijn subformules
+    {
+        ! p[formula], c[formula] : Parent(p, c) <- Neg(c, p).
+        ! p[formula], c[formula] : Parent(p, c) <- ? f2[formula] : And(c, f2, p) | And(f2, c, p).
+        ! p[formula], c[formula] : Parent(p, c) <- ? a[agent] : Knows(a, c, p).
+        ! p[formula], c[formula] : Parent(p, c) <- ? g[group] : Common(g, c, p).
+		! p[formula], c[formula] : Parent(p, c) <- ? g[group] : Distributed(g, c, p).
+    }
+    
+    // Elke formule heeft maximaal één ouder
+    ! f[formula] : #{p[formula] : Parent(p, f)} =< 1.
+    
+    // Een formule mag niet twee keer in dezelfde And gebruikt worden
+    ! f1[formula], f2[formula], p[formula]: And(f1, f2, p) => f1 ~= f2.
+
+    // De syntax boom is acyclisch
+    // Inductieve definitie voor descendant om oneindige lussen te voorkomen
+    {
+    	// Basisstap: formule c is een descendant van p als p de directe parent van c is
+    	! c[formula], p[formula] : Descendant(c, p) <- Parent(p, c).
+    	// Transitieve stap: formule c is een descendant van p als c afstamt van een tussenliggende formule mid waarvan p de ouder is.
+    	! c[formula], p[formula] : Descendant(c, p) <- ? mid[formula] : Descendant(c, mid) & Parent(p, mid).
+    }
+ 
+    // Een formule is geen descendant van zichzelf
+    ! f[formula] : ~Descendant(f, f).
+
+    // Een formule is een root asa deze geen enkele ouder heeft
+    ! f[formula] : Root(f) <=> ~? p[formula] : Parent(p, f).
+    #{f[formula] : Root(f)} = 1. // exact 1 root per structuur
+}
+    
+// ***************************************************************
+
+// De volgende structuren geven enkele voorbeelden van correcte en incorrecte formules.
+structure ValidFormulaStructure:FormulaVoc {
+    primitiveProp = {p;q}
+    agent = {a1}
+    formula = {f1;f2;f3;f4}
+    
+    Knows = {a1, f2, f1}
+    And = {f3, f4, f2}
+    Prop = {p, f3; q,f4}
+    Neg = {}
+}
+
+structure InvalidFormulaStructure1:FormulaVoc {
+    primitiveProp = {p;q}
+    agent = {a1}
+    formula = {f1;f2;f3;f4}
+    
+    Knows = {a1, f2, f1; a1, f4, f2}
+    And = {f4, f3, f2}
+    Prop = {p, f3; q,f4}
+    Neg = {}
+}
+
+structure InvalidFormulaStructure2:FormulaVoc {
+    primitiveProp = {p;q}
+    agent = {a1}
+    formula = {f1;f2;f3;f4}
+    
+    Knows = {a1, f2, f1; a1, f1, f4}
+    And = {f4, f3, f2}
+    Prop = {p, f3}
+    Neg ={}
+   
+}
+
+structure InvalidFormulaStructure3:FormulaVoc {
+    primitiveProp = {p;q}
+    agent = {a1}
+    formula = {f1;f2;f3;f4}
+    
+    Knows = {a1, f2, f1; a1, f3, f2; a1, f4, f3;a1, f1, f4}
+    And = {}
+    Prop = {}
+    Neg = {}
+}
+
+structure InvalidFormulaStructure4:FormulaVoc {
+    primitiveProp = {p;q}
+    agent={a1}
+    formula = {f1; f2; f3; f4; f5}
+    
+    Knows = {a1, f2, f1; a1, f3, f4}
+    Neg = {f4, f5}
+    Prop = {p, f2; q, f3}
+    And = {}
+}
+
+structure InvalidFormulaStructure5:FormulaVoc {
+    primitiveProp = {p}
+    agent={a1}
+    formula = {f1; f2; f3; f4}
+    
+    Knows = {a1, f2, f3}
+    Neg = {}
+    Prop = {p, f1}
+    And = {f3, f1, f2}
+}
+
+structure InvalidFormulaStructure6:FormulaVoc {
+    primitiveProp = {p}
+    agent={a1}
+    formula = {f1; f2; f3; f4}
+    
+    Knows = {a1, f2, f3}
+    Neg = {f1, f1; f4, f2}
+    Prop = {p, f4}
+    And = {}
+}
+
+structure InvalidFormulaStructure7:FormulaVoc {
+    primitiveProp = {p}
+    agent={a1}
+    formula = {f1; f2; f3; f4}
+    
+    Knows = {a1, f3, f2}
+    Neg = {}
+    Prop = {p, f3}
+    And = {f2, f2, f1}
+}
+
+structure InvalidFormulaStructure8:FormulaVoc {
+    primitiveProp = {p}
+    agent={a1; a2}
+    formula = {f1; f2; f3; f4; f5}
+    
+    Knows = {a2, f4, f2; a1, f5, f4}
+    Neg = {f4, f3}
+    Prop = {p, f5}
+    And = {f2, f3, f1}
+}
+
+// In wat volgt modelleren we de semantiek van epistemische logica.
+vocabulary ModalLogicVoc{
+    extern vocabulary FormulaVoc
+    extern vocabulary KripkeStructureVoc
+
+    satisfies(state,formula) // is waar asa formula #2 satisfied is in state #1
+    is_valid(formula) // is waar asa de formule valide is in de Kripke structuur die is geencodeerd door  holds/2 en pos/3
+    is_satisfiable(formula) // is waar asa de formule satisfiable is in de Kripke structuur die is geencodeerd door  holds/2 en pos/3
+    is_unsatisfiable(formula) // is waar asa de formule unsatisfiable is in de Kripke structuur die is geencodeerd door  holds/2 en pos/3
+    
+    
+    // Voeg meer predicaten/functies toe indien nodig
+	CommonAccess(group, state, state) // is waar asa state #3 bereikbaar is van #2 via een pad van groepsleden uit #1
+}
+
+// *************** Taak 4 **************************
+theory SemanticsOfModalFormulas:ModalLogicVoc{
+    // Inductieve definitie voor CommonAcess (Deel 2)
+    {
+        // Basisstap: Er is een directe stap mogelijk via minstens 1 agent uit de groep
+        ! g[group], s1[state], s2[state] : CommonAccess(g, s1, s2) <- 
+            ? a[agent] : InGroup(a, g) & pos(a, s1, s2).
+            
+        // Inductieve stap: Je kunt s2 bereiken via een tussenstap s3
+        ! g[group], s1[state], s2[state] : CommonAccess(g, s1, s2) <- 
+            ? s3[state], a[agent] : CommonAccess(g, s1, s3) & InGroup(a, g) & pos(a, s3, s2). // lineaire recursie ipv boomrecursie om rekenwerk te besparen
+    }
+    // ***********************
+    // Definitie van satisfies
+    // ***********************
+    {
+        // Proposities: is waar als holds dit aangeeft
+        ! s[state], f[formula], p[primitiveProp] : satisfies(s, f) <- Prop(p, f) & holds(s, p).
+        
+        // Negatie: is waar als de subformule f1 niet waar is
+        ! s[state], f[formula], f1[formula] : satisfies(s, f) <- Neg(f1, f) & ~satisfies(s, f1).
+        
+        // And: is waar als beide subformules waar zijn
+        ! s[state], f[formula], f1[formula], f2[formula] : satisfies(s, f) <- And(f1, f2, f) & satisfies(s, f1) & satisfies(s, f2).
+        
+        // Knows: is waar als f1 waar is in alle states s2 die agent a mogelijk beschouwt
+        ! s[state], f[formula], a[agent], f1[formula] : satisfies(s, f) <- Knows(a, f1, f) & (! s2[state] : pos(a, s, s2) => satisfies(s2, f1)).
+        
+            
+        // *********** DEEL 2 ***********
+            
+        // Distributed Knowledge (D_G(f1)): is waar als f1 waar is in alle states die door alle agenten in de groep als mogelijk worden beschouwd
+        ! s[state], f[formula], g[group], f1[formula] : satisfies(s, f) <- Distributed(g, f1, f) & 
+            (! s2[state] : (! a[agent] : InGroup(a, g) => pos(a, s, s2)) => satisfies(s2, f1)).
+
+        // Common Knowledge (C_G(f1)): is waar als f1 waar is in alle states die bereikbaar zijn via CommonAccess
+        ! s[state], f[formula], g[group], f1[formula] : satisfies(s, f) <- Common(g, f1, f) & 
+            (! s2[state] : CommonAccess(g, s, s2) => satisfies(s2, f1)).
+    }
+
+    // Definities voor de globale status van een formule
+    ! f[formula] : is_valid(f) <=> (! s[state] : satisfies(s, f)).
+    ! f[formula] : is_satisfiable(f) <=> (? s[state] : satisfies(s, f)).
+    ! f[formula] : is_unsatisfiable(f) <=> ~is_satisfiable(f).
+        
+    
+}
+// ***************************************************************
+
+structure SatisfiableFormula : ModalLogicVoc {
+    agent={a1;a2}
+    state={s1; s2; s3; s4}
+    primitiveProp = {r}
+    holds={s4, r; s1, r}
+    pos = {a1, s1, s1; a1, s2, s2; a1, s3, s3; a1, s4, s4;  
+    		a2, s1, s1; a2, s2, s2; a2, s3, s3; a2, s4, s4;
+    		a1, s1, s2; a1, s2, s1;
+    		a1, s2, s3; a1, s3, s2;
+    		a1, s2, s4; a1, s4, s2;
+    		a1, s1, s3; a1, s3, s1;
+    		a1, s4, s3; a1, s3, s4;
+    		a1, s4, s1; a1, s1, s4;
+    		a2, s4, s3; a2, s3, s4;}
+    
+    formula = {f1; f2; f3; f4; f5; f6; f7;}
+    
+    Prop = {r, f1; r, f5}
+    Neg = {f2, f3}
+    Knows = {a2, f5, f6; a1, f1, f2; a2, f3, f4 }
+    And = {f4, f6, f7}
+}
+
+structure UnsatisfiableFormula : ModalLogicVoc {
+    agent={a1;a2}
+    state={s1; s2; s3; s4}
+    primitiveProp = {r}
+    holds={s4, r; s1, r}
+    pos = {a1, s1, s1; a1, s2, s2; a1, s3, s3; a1, s4, s4;  
+    		a2, s1, s1; a2, s2, s2; a2, s3, s3; a2, s4, s4;
+    		a1, s1, s2; a1, s2, s1;
+    		a1, s2, s3; a1, s3, s2;
+    		a1, s2, s4; a1, s4, s2;
+    		a1, s1, s3; a1, s3, s1;
+    		a1, s4, s3; a1, s3, s4;
+    		a1, s4, s1; a1, s1, s4;
+    		a2, s4, s3; a2, s3, s4;}
+    
+    formula = {f1; f2; f3; f4; f5; f6; f7; f8; f9}
+    
+    Prop = {r, f1; r, f6}
+    Neg = {f1, f2; f7, f8}
+    Knows = {a1, f6, f7; a2, f2, f3; a1, f3, f4; a2, f4, f5; }
+    And = {f5, f8, f9}
+}
+
+structure ValidFormula : ModalLogicVoc {
+    agent={a1;a2}
+    state={s1; s2; s3; s4}
+    primitiveProp = {r}
+    holds={s4, r; s1, r}
+    pos = {a1, s1, s1; a1, s2, s2; a1, s3, s3; a1, s4, s4;  
+    		a2, s1, s1; a2, s2, s2; a2, s3, s3; a2, s4, s4;
+    		a1, s1, s2; a1, s2, s1;
+    		a1, s2, s3; a1, s3, s2;
+    		a1, s2, s4; a1, s4, s2;
+    		a1, s1, s3; a1, s3, s1;
+    		a1, s4, s3; a1, s3, s4;
+    		a1, s4, s1; a1, s1, s4;
+    		a2, s4, s3; a2, s3, s4;}
+    
+    formula = {f1; f2; f3}
+    Prop={r,f1}
+    Knows = {a1, f1, f2}
+    Neg = {f2, f3}
+    And = {}
+}
+
+// *************** Taak 5 **************************
+theory Task5Theory : ModalLogicVoc {
+    // KRIPKE STRUCTUUR CONSTRAINTS (Taak 1)
+    ! a[agent], s[state] : pos(a, s, s).
+    ! a[agent], s1[state], s2[state] : pos(a, s1, s2) => pos(a, s2, s1). 
+    ! a[agent], s1[state], s2[state], s3[state] : (pos(a, s1, s2) & pos(a, s2, s3)) => pos(a, s1, s3).
+
+    // SYNTAX CONSTRAINTS (Taak 3)
+    ! f[formula] : #{p[primitiveProp] : Prop(p, f)} + 
+                   #{f1[formula] : Neg(f1, f)} + 
+                   #{f1[formula], f2[formula] : And(f1, f2, f)} + 
+                   #{a[agent], f1[formula] : Knows(a, f1, f)} +
+                   #{g[group], f1[formula] : Common(g, f1, f)} + 
+                   #{g[group], f1[formula] : Distributed(g, f1, f)} = 1.
+
+    {
+        ! p[formula], c[formula] : Parent(p, c) <- Neg(c, p).
+        ! p[formula], c[formula] : Parent(p, c) <- ? f2[formula] : And(c, f2, p) | And(f2, c, p).
+        ! p[formula], c[formula] : Parent(p, c) <- ? a[agent] : Knows(a, c, p).
+        ! p[formula], c[formula] : Parent(p, c) <- ? g[group] : Common(g, c, p).
+		! p[formula], c[formula] : Parent(p, c) <- ? g[group] : Distributed(g, c, p).
+    }
+    
+    ! f[formula] : #{p[formula] : Parent(p, f)} =< 1.
+    ! f1[formula], f2[formula], p[formula]: And(f1, f2, p) => f1 ~= f2.
+
+    {
+    	! c[formula], p[formula] : Descendant(c, p) <- Parent(p, c).
+    	! c[formula], p[formula] : Descendant(c, p) <- ? mid[formula] : Descendant(c, mid) & Parent(p, mid).
+    }
+ 
+    ! f[formula] : ~Descendant(f, f).
+    ! f[formula] : Root(f) <=> ~? p[formula] : Parent(p, f).
+    #{f[formula] : Root(f)} = 1.
+
+    // SEMANTIEK CONSTRAINTS (Taak 4)
+    {
+        ! s[state], f[formula], p[primitiveProp] : satisfies(s, f) <- Prop(p, f) & holds(s, p).
+        ! s[state], f[formula], f1[formula] : satisfies(s, f) <- Neg(f1, f) & ~satisfies(s, f1).
+        ! s[state], f[formula], f1[formula], f2[formula] : satisfies(s, f) <- And(f1, f2, f) & satisfies(s, f1) & satisfies(s, f2).
+        ! s[state], f[formula], a[agent], f1[formula] : satisfies(s, f) <- Knows(a, f1, f) & (! s2[state] : pos(a, s, s2) => satisfies(s2, f1)).
+        ! s[state], f[formula], g[group], f1[formula] : satisfies(s, f) <- Distributed(g, f1, f) & 
+            (! s2[state] : (! a[agent] : InGroup(a, g) => pos(a, s, s2)) => satisfies(s2, f1)).
+        ! s[state], f[formula], g[group], f1[formula] : satisfies(s, f) <- Common(g, f1, f) & 
+            (! s2[state] : CommonAccess(g, s, s2) => satisfies(s2, f1)).
+    }
+    ! f[formula] : is_valid(f) <=> (! s[state] : satisfies(s, f)).
+    ! f[formula] : is_satisfiable(f) <=> (? s[state] : satisfies(s, f)).
+    ! f[formula] : is_unsatisfiable(f) <=> ~is_satisfiable(f).
+
+    // TAAK 5
+    // Er moet ergens in de syntaxboom minstens 1 Knows-operator zitten
+    ? a[agent], f_child[formula], f_parent[formula] : Knows(a, f_child, f_parent).
+}
+
+// Vier cases van Taak 5
+theory Case1_Valid : ModalLogicVoc {
+    // Case 1: Formule is valide
+    ? f[formula] : Root(f) & is_valid(f).
+}
+
+theory Case2_SatNotValid : ModalLogicVoc {
+    // Case 2: Formule is satisfiable, maar niet valid
+    ? f[formula] : Root(f) & is_satisfiable(f) & ~is_valid(f).
+}
+
+theory Case3_Unsat : ModalLogicVoc {
+    // Case 3: Formule is unsatisfiable
+    ? f[formula] : Root(f) & is_unsatisfiable(f).
+}
+
+theory Case4_KnowsUnsat : ModalLogicVoc {
+    // Case 4: Formule is K_i(phi). phi is satisfiable. K_i(phi) is unsatisfiable
+    ? root[formula], phi[formula], i[agent] : 
+        Root(root) & 
+        Knows(i, phi, root) & 
+        is_satisfiable(phi) & 
+        is_unsatisfiable(root).
+}
+
+structure Task5Structure : ModalLogicVoc {
+    agent = {a1; a2; a3; a4}
+    primitiveProp = {p1; p2}
+    formula = {f1; f2; f3; f4; f5; f6; f7}
+    state = {s1; s2; s3; s4}
+}
+    
+// *************** Deel 2 **************************
+structure TestDeel2Structure : ModalLogicVoc {
+    // Domeinen
+    agent = {a1; a2}
+    group = {g1}
+    InGroup = {a1, g1; a2, g1} // a1 en a2 zitten beide in groep g1
+    state = {s1; s2}
+    primitiveProp = {p}
+    
+    // Kripke model invulling
+    holds = {s1, p; s2, p} // p is waar in beide states
+    
+    // a1 ziet geen verschil tussen s1 en s2, a2 weet exact waar hij is
+    pos = {a1, s1, s1; a1, s2, s2; a1, s1, s2; a1, s2, s1; 
+           a2, s1, s1; a2, s2, s2}
+           
+    // Formules opbouwen
+    formula = {f_prop; f_common; f_dist}
+    Prop = {p, f_prop}                  // f_prop = p
+    Common = {g1, f_prop, f_common}     // f_common = C_g1(p)
+    Distributed = {g1, f_prop, f_dist}  // f_dist = D_g1(p)
+    
+    // Lege verzamelingen zodat IDP geen willekeurige syntaxrelaties genereert
+    Neg = {}
+    And = {}
+    Knows = {}
+}
+
+// ***************************************************************
+
+
+procedure main(){
+    // Deel 1
+    // ------
+    
+    // Taak 1
+    print("---------------Taak1--------------")
+    stdoptions.nbmodels = 0 // zoek alle gevonden modellen om unsat te bewijzen
+    
+    sols = modelexpand(ValidKripkeStructureTheory, ValidKripkeStructureTest1)
+    print("ValidKripkeStructureTest:")
+    printmodels(sols) // 1 geldig model
+    
+    sols_invalid1 = modelexpand(ValidKripkeStructureTheory, InvalidKripkeStructureTest1)
+    print("InvalidKripkeStructureTest1:")
+    printmodels(sols_invalid1) // Unsatisfiable omdat het symmetrie mist
+    
+    sols_invalid2 = modelexpand(ValidKripkeStructureTheory, InvalidKripkeStructureTest2)
+    print("InvalidKripkeStructureTest2:")
+    printmodels(sols_invalid2) // Unsatisfiable omdat het reflexiviteit mist
+    
+    sols_invalid3 = modelexpand(ValidKripkeStructureTheory, InvalidKripkeStructureTest3)
+    print("InvalidKripkeStructureTest3:")
+    printmodels(sols_invalid3) // Unsatisfiable omdat het transiviteit mist
+    
+    
+    // Taak 2
+    print("---------------Taak2---------------")
+    stdoptions.symmetrybreaking = "static"
+    stdoptions.nbmodels = 1 // zoek 1 model
+    
+    sols = modelexpand(ValidKripkeStructureTheory, Task2Structure)
+    printmodels(sols)
+    
+    // Taak 3
+    print("---------------Taak3---------------")
+    stdoptions.nbmodels = 0 // zoek alle modellen
+    
+    sols_valid = modelexpand(SyntaxOfModalFormulas, ValidFormulaStructure)
+    printmodels(sols_valid)
+    
+    sols_invalid = modelexpand(SyntaxOfModalFormulas, InvalidFormulaStructure1)
+    printmodels(sols_invalid) // Unsatisfiable omdat f2 max. 1 ouder mag hebben
+    
+    
+    // Taak 4
+    print("---------------Taak 4---------------")
+    stdoptions.nbmodels = 1 // zoek 1 model
+    
+    sols_sat = modelexpand(SemanticsOfModalFormulas, SatisfiableFormula)
+    printmodels(sols_sat)
+    
+    sols_unsat = modelexpand(SemanticsOfModalFormulas, UnsatisfiableFormula)
+    printmodels(sols_unsat)
+    
+    sols_valid = modelexpand(SemanticsOfModalFormulas, ValidFormula)
+    printmodels(sols_valid)
+    
+    
+    // Taak 5
+    print("---------------Taak 5---------------")
+    stdoptions.symmetrybreaking = "static"
+    stdoptions.nbmodels = 1
+    
+    // merge zodat we meerdere logische blokken kunnen combineren
+    print("Case 1: Valid")
+    sols_case1 = modelexpand(merge(Task5Theory, Case1_Valid), Task5Structure)
+    printmodels(sols_case1)
+
+    print("Case 2: Satisfiable but not Valid")
+    sols_case2 = modelexpand(merge(Task5Theory, Case2_SatNotValid), Task5Structure)
+    printmodels(sols_case2)
+
+    print("Case 3: Unsatisfiable")
+    sols_case3 = modelexpand(merge(Task5Theory, Case3_Unsat), Task5Structure)
+    printmodels(sols_case3)
+
+    print("Case 4: K_i(phi) Unsat, but phi Sat")
+    sols_case4 = modelexpand(merge(Task5Theory, Case4_KnowsUnsat), Task5Structure)
+    printmodels(sols_case4)
+    
+    
+    // Deel 2
+    print("---------------Deel 2---------------")
+    stdoptions.nbmodels = 1
+    
+    sols_deel2 = modelexpand(SemanticsOfModalFormulas, TestDeel2Structure)
+    printmodels(sols_deel2)
+    
+}
