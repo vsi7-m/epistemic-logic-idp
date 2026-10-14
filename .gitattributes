@@ -1,1 +1,2 @@
 *.idp linguist-language=C++
+*.idp linguist-detectable=false
